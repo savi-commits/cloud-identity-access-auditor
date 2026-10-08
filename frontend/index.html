@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Identity and Access Auditor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════
+       BACKEND STATUS BANNER (shown only when Flask is not reachable)
+  ═══════════════════════════════════════════ -->
+  <div class="backend-banner hidden" id="backendBanner">
+    <div class="backend-banner-inner">
+      <span class="backend-banner-icon">⚠️</span>
+      <div class="backend-banner-text">
+        <strong>Backend is not running.</strong>
+        Start the Flask server to use the audit features.
+        <span class="backend-banner-hint">Double-click <code>run_project.bat</code> inside the project folder to start it.</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btnRetry">&#x21BB; Retry Connection</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-logo">
+        <span class="logo-icon">&#x1F6E1;</span>
+        <div>
+          <h1>Cloud Identity &amp; Access Auditor</h1>
+          <p class="header-subtitle">Review IAM configurations and detect access risks</p>
+        </div>
+      </div>
+      <div class="header-badge" id="statusBadge">● READY</div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════
+       SUMMARY CARDS
+  ═══════════════════════════════════════════ -->
+  <main class="container">
+    <section class="cards-grid" id="summaryCards">
+      <div class="card" id="card-users">
+        <div class="card-icon">👤</div>
+        <div class="card-value" id="val-users">--</div>
+        <div class="card-label">Total Users</div>
+      </div>
+      <div class="card card-warn" id="card-inactive">
+        <div class="card-icon">💤</div>
+        <div class="card-value" id="val-inactive">--</div>
+        <div class="card-label">Inactive Accounts</div>
+      </div>
+      <div class="card card-danger" id="card-excessive">
+        <div class="card-icon">⚠️</div>
+        <div class="card-value" id="val-excessive">--</div>
+        <div class="card-label">Excessive Permissions</div>
+      </div>
+      <div class="card card-danger" id="card-risky">
+        <div class="card-icon">📋</div>
+        <div class="card-value" id="val-risky">--</div>
+        <div class="card-label">Risky Policies</div>
+      </div>
+      <div class="card card-warn" id="card-mfa">
+        <div class="card-icon">🔐</div>
+        <div class="card-value" id="val-mfa">--</div>
+        <div class="card-label">MFA Disabled</div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════
+         IAM DATA INPUT SECTION
+    ═══════════════════════════════════════════ -->
+    <section class="panel">
+      <h2 class="panel-title">&#x1F4C2; IAM Data Input</h2>
+
+      <div class="input-options">
+        <!-- Option 1: Load sample data -->
+        <div class="input-option">
+          <h3>Option 1 — Use Sample Data</h3>
+          <p class="muted">Load pre-built fictional IAM data to see the auditor in action immediately.</p>
+          <button class="btn btn-secondary" id="btnLoadSample">
+            &#x26A1; Load Sample Data
+          </button>
+        </div>
+
+        <!-- Divider -->
+        <div class="or-divider"><span>OR</span></div>
+
+        <!-- Option 2: Paste / upload own JSON -->
+        <div class="input-option">
+          <h3>Option 2 — Enter Your Own IAM JSON</h3>
+          <p class="muted">Paste a JSON object with <code>users</code> and/or <code>roles</code> arrays.</p>
+          <label class="upload-label" for="fileUpload">
+            &#x1F4C4; Upload JSON File
+            <input type="file" id="fileUpload" accept=".json" />
+          </label>
+        </div>
+      </div>
+
+      <!-- JSON textarea -->
+      <div class="textarea-wrap">
+        <div class="textarea-header">
+          <span>IAM Configuration JSON</span>
+          <button class="btn-clear" id="btnClear" title="Clear editor">✕ Clear</button>
+        </div>
+        <textarea
+          id="iamInput"
+          spellcheck="false"
+          placeholder='Paste your IAM JSON here or click "Load Sample Data" above…'
+        ></textarea>
+      </div>
+
+      <!-- Error message area -->
+      <div class="error-box hidden" id="errorBox">
+        <span class="error-icon">⚠</span>
+        <span id="errorMsg"></span>
+      </div>
+
+      <!-- Run Audit button -->
+      <div class="audit-btn-wrap">
+        <button class="btn btn-primary" id="btnAudit">
+          &#x1F50D; Run Security Audit
+        </button>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════
+         RESULTS SECTION (hidden until audit runs)
+    ═══════════════════════════════════════════ -->
+    <section class="panel hidden" id="resultsSection">
+
+      <!-- Score + Risk Level -->
+      <div class="score-row">
+        <div class="score-box">
+          <div class="score-label">Security Score</div>
+          <div class="score-value" id="scoreValue">--</div>
+          <div class="score-sub">out of 100</div>
+        </div>
+        <div class="risk-box" id="riskBox">
+          <div class="risk-label">Overall Risk Level</div>
+          <div class="risk-value" id="riskValue">--</div>
+          <div class="risk-bar-wrap">
+            <div class="risk-bar" id="riskBar"></div>
+          </div>
+        </div>
+        <div class="status-box">
+          <div class="status-label">Audit Status</div>
+          <div class="status-indicators">
+            <div class="status-item" id="si-secure">
+              <span class="dot dot-green"></span> Secure
+            </div>
+            <div class="status-item" id="si-review">
+              <span class="dot dot-yellow"></span> Needs Review
+            </div>
+            <div class="status-item" id="si-high">
+              <span class="dot dot-red"></span> High Risk
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Findings Table -->
+      <h2 class="panel-title" style="margin-top:2rem">&#x1F50E; Audit Findings</h2>
+      <div class="table-wrap">
+        <table class="findings-table" id="findingsTable">
+          <thead>
+            <tr>
+              <th>User / Role</th>
+              <th>Type</th>
+              <th>Finding</th>
+              <th>Severity</th>
+              <th>Reason</th>
+              <th>Recommendation</th>
+            </tr>
+          </thead>
+          <tbody id="findingsBody">
+          </tbody>
+        </table>
+        <div class="no-findings hidden" id="noFindings">
+          ✅ No security issues found. Your IAM configuration looks good!
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="recs-panel" id="recsPanel">
+        <h2 class="panel-title">&#x1F4A1; Recommendations</h2>
+        <ul class="recs-list" id="recsList"></ul>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════════ -->
+  <footer class="site-footer">
+    <p>Cloud Identity &amp; Access Auditor &nbsp;|&nbsp; Educational Project &nbsp;|&nbsp; No real credentials required</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
